@@ -1,0 +1,18 @@
+FROM amazoncorretto
+
+# Default jenkins.war version to download, you can set it manual
+# on build by adding "--build-arg JENKINS_VER=<value>"
+ARG JENKINS_VER=latest
+
+# Default Jenkins app http-port, may be changed on build
+# by adding "--build-arg JENKINS_HTTP_PORT=<value>"
+ARG JENKINS_HTTP_PORT
+ENV JENKINS_HTTP_PORT=${JENKINS_HTTP_PORT:-8081}
+
+ADD https://get.jenkins.io/war-stable/${JENKINS_VER}/jenkins.war /app/
+
+EXPOSE ${JENKINS_HTTP_PORT}
+
+WORKDIR /app
+
+ENTRYPOINT java -jar jenkins.war --httpPort=${JENKINS_HTTP_PORT}
