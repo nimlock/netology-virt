@@ -1,0 +1,11 @@
+version: '3'
+services:
+  sql-server:
+    image: mysql:8
+    restart: unless-stopped
+    volumes:
+      - ./bases_test/:/var/lib/mysql
+    environment:
+      - TZ=Asia/Yekaterinburg
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=test_db
