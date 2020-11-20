@@ -1,0 +1,12 @@
+version: '3'
+services:
+  sql-server:
+    image: postgres:13
+    restart: unless-stopped
+    volumes:
+      - ./bases_test/:/data/bases
+    environment:
+      - TZ=Asia/Yekaterinburg
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=postgres
+      - PGDATA=/data/bases
