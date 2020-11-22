@@ -35,7 +35,65 @@
 >
 >Далее мы будем работать с данным экземпляром elasticsearch.
 
+### Решение
 
+Для создания образа создан [Dockerfile](Dockerfile). Команды для создания образа и отправки его в репозиторий:
+
+```
+docker build -f Dockerfile -t my_elasticsearch .
+docker tag my_elasticsearch nimlock/netology-homework-6.5
+docker push nimlock/netology-homework-6.5
+```
+
+Чтобы выполнить требования к заданию в Dockerfile была определена переменная окруженния `ES_PATH_DATA`, которая в дальнейшем указывается в конфигурационном файле `elasticsearch.yml`. Имя ноды будет браться из переменной `HOSTNAME`.
+
+Для возможности определять конфигурацию сервиса без подключения в контейнер поднимем временный контейнер, скопируем из него конфиг-файлы и удалим временный контейнер. В дальнейнем эти файлы будут монтироваться поверх файлов в контейнере.
+
+```
+docker run -d --name my_elasticsearch_temp nimlock/netology-homework-6.5
+docker cp my_elasticsearch:/app/elasticsearch-7.10.0/config/elasticsearch.yml ./config
+docker cp my_elasticsearch:/app/elasticsearch-7.10.0/config/jvm.options ./config
+docker cp my_elasticsearch:/app/elasticsearch-7.10.0/config/log4j2.properties ./config
+docker rm -f my_elasticsearch_temp
+```
+
+Используя информацию из [оф.документации](https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html) для работы сервиса в standalone режиме с возможностью доступа к API по "non-localhost"-адресам нужно сделать две вещи:
+
+- в [elasticsearch.yml](config/elasticsearch.yml) задать опции `discovery.type: single-node` и `network.host: 0.0.0.0`
+- отключить часть проверок при запуске с помощью определения переменной `es.enforce.bootstrap.checks=true` в [docker-compose.yml](docker-compose.yml)
+
+Запустим сервис задав его параметры с помощью манифеста [docker-compose](docker-compose.yml).
+
+```
+docker-compose up -d
+```
+
+### Ответ
+
+- ссылка на [Dockerfile](Dockerfile)
+- ссылка на [образ в DockerHub](https://hub.docker.com/repository/docker/nimlock/netology-homework-6.5)
+- ответ `elasticsearch` на запрос пути `/` в json виде:
+
+    ```
+    ivan@kubang:~/study/netology-virt/06-db-05-elasticsearch$ curl -X GET localhost:9200/
+    {
+    "name" : "netology_test",
+    "cluster_name" : "elasticsearch",
+    "cluster_uuid" : "GziYkU7TQaS0ytXVMxAlMA",
+    "version" : {
+        "number" : "7.10.0",
+        "build_flavor" : "default",
+        "build_type" : "tar",
+        "build_hash" : "51e9d6f22758d0374a0f3f5c6e8f3a7997850f96",
+        "build_date" : "2020-11-09T21:30:33.964949Z",
+        "build_snapshot" : false,
+        "lucene_version" : "8.7.0",
+        "minimum_wire_compatibility_version" : "6.8.0",
+        "minimum_index_compatibility_version" : "6.0.0-beta1"
+    },
+    "tagline" : "You Know, for Search"
+    }
+    ```
 
 ## Задача 2
 
@@ -66,7 +124,79 @@
 >При проектировании кластера elasticsearch нужно корректно рассчитывать количество реплик и шард,
 >иначе возможна потеря данных индексов, вплоть до полной, при деградации системы.
 
+### Решение
 
+Запросы на создание индексов:
+
+```
+curl -X PUT "localhost:9200/ind-1?pretty" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
+'
+curl -X PUT "localhost:9200/ind-2?pretty" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "number_of_shards": 2,
+    "number_of_replicas": 1
+  }
+}
+'
+curl -X PUT "localhost:9200/ind-3?pretty" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "number_of_shards": 4,
+    "number_of_replicas": 2
+  }
+}
+'
+```
+
+Список индексов и их статусы можно получить следующим запросом:
+
+```
+ivan@kubang:~/study/netology-virt/06-db-05-elasticsearch$ curl -X GET "localhost:9200/_cat/indices?pretty"
+green  open ind-1 UNBbTycwR7q6zLr_u0xrXg 1 0 0 0 208b 208b
+yellow open ind-3 gILROa3GQ6G7Jw0Vk68b4w 4 2 0 0 832b 832b
+yellow open ind-2 v_wj-gWJQROwaT0rKuy4KA 2 1 0 0 416b 416b
+```
+
+Состояние кластера проверим запросом:
+
+```
+ivan@kubang:~/study/netology-virt/06-db-05-elasticsearch$ curl -X GET "localhost:9200/_cluster/health?pretty"
+{
+  "cluster_name" : "elasticsearch",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 7,
+  "active_shards" : 7,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 10,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 41.17647058823529
+}
+```
+
+Индексы `ind-2` и `ind-3` находятся в статусе `yellow` из-за того, что созданные реплики шард не могут "развернуться", так как у нас в кластере только одна нода (а на ней уже развёрнуты primary-шарды). Для решения проблемы нужно добавть ещё две ноды, т.к. для `ind-3` задано две реплики.  
+Весть кластер находится в статусе `yellow` так как часть индексов, расположенных в нём, в этом же статусе.
+
+Удалить индексы можно запросами:
+
+```
+curl -X DELETE "localhost:9200/ind-1?pretty"
+curl -X DELETE "localhost:9200/ind-2?pretty"
+curl -X DELETE "localhost:9200/ind-3?pretty"
+```
 
 ## Задача 3
 

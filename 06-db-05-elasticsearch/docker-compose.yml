@@ -1,0 +1,14 @@
+version: '3'
+services:
+  elastic-server:
+    image: nimlock/netology-homework-6.5
+    volumes:
+      - ./config/elasticsearch.yml:/app/elasticsearch-7.10.0/config/elasticsearch.yml
+      - ./config/jvm.options:/app/elasticsearch-7.10.0/config/jvm.options
+      - ./config/log4j2.properties:/app/elasticsearch-7.10.0/config/log4j2.properties
+    environment:
+      - TZ=Asia/Yekaterinburg
+      - HOSTNAME=netology_test
+      - enforce.bootstrap.checks=true
+    ports:
+      - 9200:9200
