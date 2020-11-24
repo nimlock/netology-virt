@@ -37,7 +37,7 @@
 
 ### Решение
 
-Для создания образа создан [Dockerfile](Dockerfile). Команды для создания образа и отправки его в репозиторий:
+Для создания образа подготовлен [Dockerfile](Dockerfile). Команды для создания образа и отправки его в репозиторий:
 
 ```
 docker build -f Dockerfile -t my_elasticsearch .
@@ -45,9 +45,11 @@ docker tag my_elasticsearch nimlock/netology-homework-6.5
 docker push nimlock/netology-homework-6.5
 ```
 
-Чтобы выполнить требования к заданию в Dockerfile была определена переменная окруженния `ES_PATH_DATA`, которая в дальнейшем указывается в конфигурационном файле `elasticsearch.yml`. Имя ноды будет браться из переменной `HOSTNAME`.
+Чтобы выполнить требования к заданию в Dockerfile была определена переменная окружения `ES_PATH_DATA`, которая в дальнейшем указывается в конфигурационном файле `elasticsearch.yml`. Имя ноды будет браться из переменной `HOSTNAME`.
 
-Для возможности определять конфигурацию сервиса без подключения в контейнер поднимем временный контейнер, скопируем из него конфиг-файлы и удалим временный контейнер. В дальнейнем эти файлы будут монтироваться поверх файлов в контейнере.
+Для возможности определять конфигурацию сервиса без подключения в контейнер поднимем временный контейнер, скопируем из него конфиг-файлы и удалим временный контейнер. В дальнейшнем эти файлы будут монтироваться поверх файлов в рабочем контейнере.
+
+_Прим.: Более хорошего/удобного решения для возможности управлять конфигами приложения в контейнере не знаю._
 
 ```
 docker run -d --name my_elasticsearch_temp nimlock/netology-homework-6.5
@@ -57,10 +59,12 @@ docker cp my_elasticsearch:/app/elasticsearch-7.10.0/config/log4j2.properties ./
 docker rm -f my_elasticsearch_temp
 ```
 
-Используя информацию из [оф.документации](https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html) для работы сервиса в standalone режиме с возможностью доступа к API по "non-localhost"-адресам нужно сделать две вещи:
+Используя информацию из [оф.документации](https://www.elastic.co/guide/en/elasticsearch/reference/current/bootstrap-checks.html) для работы сервиса в standalone-режиме с возможностью доступа к API по "non-localhost"-адресам нужно сделать две вещи:
 
 - в [elasticsearch.yml](config/elasticsearch.yml) задать опции `discovery.type: single-node` и `network.host: 0.0.0.0`
 - отключить часть проверок при запуске с помощью определения переменной `es.enforce.bootstrap.checks=true` в [docker-compose.yml](docker-compose.yml)
+
+_Прим: Эта настройка не используется в задании, но может быть полезна в будущем._
 
 Запустим сервис задав его параметры с помощью манифеста [docker-compose](docker-compose.yml).
 
@@ -68,7 +72,7 @@ docker rm -f my_elasticsearch_temp
 docker-compose up -d
 ```
 
-### Ответ
+### Ответы
 
 - ссылка на [Dockerfile](Dockerfile)
 - ссылка на [образ в DockerHub](https://hub.docker.com/repository/docker/nimlock/netology-homework-6.5)
@@ -187,8 +191,8 @@ ivan@kubang:~/study/netology-virt/06-db-05-elasticsearch$ curl -X GET "localhost
 }
 ```
 
-Индексы `ind-2` и `ind-3` находятся в статусе `yellow` из-за того, что созданные реплики шард не могут "развернуться", так как у нас в кластере только одна нода (а на ней уже развёрнуты primary-шарды). Для решения проблемы нужно добавть ещё две ноды, т.к. для `ind-3` задано две реплики.  
-Весть кластер находится в статусе `yellow` так как часть индексов, расположенных в нём, в этом же статусе.
+Индексы `ind-2` и `ind-3` находятся в статусе `yellow` из-за того, что созданные реплики шард не могут "развернуться" так как у нас в кластере только одна нода (а на ней уже развёрнуты primary-шарды). Для решения проблемы нужно добавить ещё две ноды т.к. для `ind-3` задано две реплики и именно этот индекс диктует минимальное количество нод для работы без предупреждений.  
+Весь кластер находится в статусе `yellow` так как часть индексов, расположенных в нём, находится в этом же статусе.
 
 Удалить индексы можно запросами:
 
@@ -228,4 +232,152 @@ curl -X DELETE "localhost:9200/ind-3?pretty"
 >Подсказки:
 >- возможно вам понадобится доработать `elasticsearch.yml` в части директивы `path.repo` и перезапустить `elasticsearch`
 
+### Решение
 
+Создадим каталог для снапшотов:
+
+```
+docker exec 06-db-05-elasticsearch_elastic-server_1 mkdir snapshots
+```
+
+Для удобства создадим "обезличенный" симлинк `elasticsearch-current` на рабочий каталог текущего релиза. Это позволит в будущем при изменении версии ПО не менять запросы к api. Если идея окажется полезной, то это изменение можно будет зафиксировать в Dockerfile.
+
+```
+docker exec 06-db-05-elasticsearch_elastic-server_1 bash -c 'cd .. && ln -snf elasticsearch-${ELASTIC_VER} elasticsearch-current'
+```
+
+Добавим путь к снапшотам в файл конфигурации `elasticsearch.yml`:
+
+```
+path:
+  repo:
+    - /app/elasticsearch-current/snapshots
+```
+
+Для применения изменений перезагрузим контейнер:
+
+```
+docker restart 06-db-05-elasticsearch_elastic-server_1
+```
+
+Теперь можно подключиться к контейнеру и зарегистрировать репозиторий:
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X PUT "localhost:9200/_snapshot/netology_backup?pretty" -H 'Content-Type: application/json' -d'
+> {
+>   "type": "fs",
+>   "settings": {
+>     "location": "/app/elasticsearch-current/snapshots"
+>   }
+> }
+> '
+{
+  "acknowledged" : true
+}
+```
+
+Создадим индекс `test`:
+
+```
+curl -X PUT "localhost:9200/test?pretty" -H 'Content-Type: application/json' -d'
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  }
+}
+'
+```
+
+Список индексов получим запросом:
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X GET "localhost:9200/_cat/indices?pretty"
+green open test bCQDEg1mSH6a17rNb8uucw 1 0 0 0 208b 208b
+```
+
+При создании снапшота без указания параметров операции происходит бэкап всех данных в кластере, что нам и требуется. Так что запрос на создание снапшота будет таким:
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X PUT "localhost:9200/_snapshot/netology_backup/snapshot_1?wait_for_completion=true&pretty"
+{
+  "snapshot" : {
+    "snapshot" : "snapshot_1",
+    "uuid" : "5C50Sp9kSeCll7KWmaCyzQ",
+    "version_id" : 7100099,
+    "version" : "7.10.0",
+    "indices" : [
+      "test"
+    ],
+    "data_streams" : [ ],
+    "include_global_state" : true,
+    "state" : "SUCCESS",
+    "start_time" : "2020-11-24T15:25:17.704Z",
+    "start_time_in_millis" : 1606231517704,
+    "end_time" : "2020-11-24T15:25:17.908Z",
+    "end_time_in_millis" : 1606231517908,
+    "duration_in_millis" : 204,
+    "failures" : [ ],
+    "shards" : {
+      "total" : 1,
+      "failed" : 0,
+      "successful" : 1
+    }
+  }
+}
+```
+
+Посмотрим на содержимое папки со снапшотами:
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ ls -la snapshots/
+total 60
+drwxr-xr-x 3 elasticuser elasticuser  4096 Nov 24 20:25 .
+drwxr-xr-x 1 elasticuser root         4096 Nov 24 19:39 ..
+-rw-r--r-- 1 elasticuser elasticuser   434 Nov 24 20:25 index-0
+-rw-r--r-- 1 elasticuser elasticuser     8 Nov 24 20:25 index.latest
+drwxr-xr-x 3 elasticuser elasticuser  4096 Nov 24 20:25 indices
+-rw-r--r-- 1 elasticuser elasticuser 30685 Nov 24 20:25 meta-5C50Sp9kSeCll7KWmaCyzQ.dat
+-rw-r--r-- 1 elasticuser elasticuser   266 Nov 24 20:25 snap-5C50Sp9kSeCll7KWmaCyzQ.dat
+```
+
+Удалим индекс `test` и создадим индекс `test-2` с последующим выводом списка индексов:
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X DELETE "localhost:9200/test?pretty"
+{
+  "acknowledged" : true
+}
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X PUT "localhost:9200/test-2?pretty" -H 'Content-Type: application/json' -d'
+> {
+>   "settings": {
+>     "number_of_shards": 1,
+>     "number_of_replicas": 0
+>   }
+> }
+> '
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "test-2"
+}
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X GET "localhost:9200/_cat/indices?pretty"
+green open test-2 2xUhI231QD60CC5NgCtgaQ 1 0 0 0 208b 208b
+```
+
+Восстановим состояние кластера из снапшота:
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X POST "localhost:9200/_snapshot/netology_backup/snapshot_1/_restore?pretty"
+{
+  "accepted" : true
+}
+```
+
+Итоговый список индексов содержит как созданный `test-2`, так и восстановленный `test` (но с другим хэшем):
+
+```
+[elasticuser@40d64c412cf2 elasticsearch-7.10.0]$ curl -X GET "localhost:9200/_cat/indices?pretty"
+green open test-2 2xUhI231QD60CC5NgCtgaQ 1 0 0 0 208b 208b
+green open test   8hqNPscQS7CTN6mn-9jRvw 1 0 0 0 208b 208b
+```

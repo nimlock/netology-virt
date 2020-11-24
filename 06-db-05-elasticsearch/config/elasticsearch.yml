@@ -36,6 +36,12 @@ path.data: ${ES_PATH_DATA}
 #
 #path.logs: /path/to/logs
 #
+# Paths to repos
+#
+path:
+  repo:
+    - /app/elasticsearch-current/snapshots
+#
 # ----------------------------------- Memory -----------------------------------
 #
 # Lock the memory on startup:
