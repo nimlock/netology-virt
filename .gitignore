@@ -1,2 +1,6 @@
-# Exclude all test-files
+# Exclude all test-files and test-folders
 **/*_test
+test_*.*
+
+# Exclude .terraform
+*/.terraform
