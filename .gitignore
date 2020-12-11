@@ -4,3 +4,4 @@ test_*.*
 
 # Exclude .terraform
 */.terraform
+*/.terraform.lock.hcl
