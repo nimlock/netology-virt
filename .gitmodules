@@ -1,0 +1,3 @@
+[submodule "terraform_repository"]
+	path = terraform_repository
+	url = https://github.com/nimlock/netology-terraform_repository
