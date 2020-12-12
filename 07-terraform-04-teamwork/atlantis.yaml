@@ -1,0 +1,27 @@
+version: 3
+automerge: true
+projects:
+- name: my-project-name
+  dir: .
+  workspace: stage
+  autoplan:
+    when_modified: ["*.tf", "./**.tf"]
+    enabled: true
+  workflow: myworkflow
+- name: my-project-name
+  dir: .
+  workspace: prod
+  autoplan:
+    when_modified: ["*.tf", "./**.tf"]
+    enabled: true
+  workflow: myworkflow
+workflows:
+  myworkflow:
+    plan:
+      steps:
+      - init
+      - plan:
+          extra_args: ["-lock", "false"]
+    apply:
+      steps:
+      - apply

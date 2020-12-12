@@ -18,6 +18,19 @@
 >
 >В качестве результата задания приложите снимок экрана с успешным применением конфигурации.
 
+1. С регистрацией на [https://app.terraform.io/](https://app.terraform.io/) проблем не возникло.
+
+1. Вынес проект terraform-а в [отдельный репозиторий](https://github.com/nimlock/netology-terraform_repository).
+
+1. Зарегистрировал этот репозиторий в Terraform Cloud.
+
+1. Переписал конфигурацию для того, чтобы окружение инфраструктуры задавалось не через build-in переменную `terraform.workspace` (которая не может быть изменена с `default` в Terraform Cloud), а через `input variable` "kvazi_workspace". Таким образом получилось сохранить логику выполнения конфигурации.
+
+   _Прим.: уже после выполнения изменений конфигурации обнаружил нужную переменную [TFC_WORKSPACE_NAME](https://www.terraform.io/docs/cloud/run/run-environment.html#tfc_workspace_name)._
+
+1. Выполнил plan и apply, результат выполнения
+
+   ![скриншот](img/task1_Screenshot_from_Terraform_Cloud.png)
 
 
 ## Задача 2. Написать серверный конфиг для атлантиса. 
@@ -38,7 +51,21 @@
 >
 >В качестве результата приложите ссылку на файлы `server.yaml` и `atlantis.yaml`.
 
+В качестве основы для конфигурационных файлов я использовал примеры с соответствующих страниц документации.
 
+Изменения в конфигурациях, относительно исходных версий:
+
+- для [файла `server.yaml`](server.yaml):
+
+  1. Укажем адрес репозитория в параметре `repos[id]`.
+  1. За эту возможность отвечает параметр `repos[allow_custom_workflows]` и он уже установлен в true.
+  1. Блокировка состояния уже снята в примере конфига параметрм `workflows.custom.plan.steps[plan].extra_args.["-lock", "false"]`.
+
+- для [файла `atlantis.yaml`](atlantis.yaml):
+
+  1. Чтобы действия призводились сразу над двумя workspace-ами небходимо определить их как отдельные проекты с единой директорией, но различными параметрами `workspace`. Параметр `workflow: myworkflow` определяет, что нужно выполнить описанный ниже индивидуальный workflow. В нём можно задать требуемые действия.
+
+  1. Включим автопланирование параметрами `autoplan:[when_modified:["*.tf", "./**.tf"],enabled:true]`
 
 ## Задача 3. Знакомство с каталогом модулей. 
 
@@ -51,4 +78,22 @@
 >
 >В качестве результата задания приложите ссылку на созданный блок конфигураций.
 
+1. Нашёл требуемый [модуль](https://registry.terraform.io/modules/terraform-aws-modules/ec2-instance/aws/latest).
 
+1. Не вижу смысла использовать данный модуль, т.к. он по сути состоит из одного функционального блока и это `resource "aws_instance"`. Мне не нравится наличие лишних строк кода в конфигурации, при необходимости я сам хотел бы задать желаемые параметры для ресурса.
+
+1. В конфигурацию проекта terraform добавим блок с описанием модуля, после чего, в случае локального исполнения кода, выполним `terraform init` для его подгрузки в проект после чего можно разворачивать инфраструктуру:
+
+    ```
+    module "ec2_module" {
+      source = "terraform-aws-modules/ec2-instance/aws"
+
+      instance_count = 1
+
+      name          = "done-with-ec2_module"
+      ami           = data.aws_ami.ubuntu.id
+      instance_type = local.dict_of_instance_types[var.kvazi_workspace]
+    }
+    ```
+
+Необходимые блоки конфигурации я дописал в [main.tf репозитория](https://github.com/nimlock/netology-terraform_repository/blob/14f25e65ac1b76dcb3bcc495f9ae097ae0e10d6b/main.tf), Terraform Cloud успешно обновил инфраструктуру.
