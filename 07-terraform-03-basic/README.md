@@ -47,7 +47,7 @@ S3 bucket создал через web-консоль AWS, в этом храни
     }
     ```
 
-1. Бэкенд в терраформ зарегистрирован благодаря добавлению в [main.tf](../terraform_repository/main.tf) такого блока:
+1. Бэкенд в терраформ зарегистрирован благодаря добавлению в [main.tf](https://github.com/nimlock/netology-terraform_repository/blob/e126472559ee4915286416442eb02c51e8fad18d/main.tf) такого блока:
 
     ```
     terraform {
@@ -163,7 +163,7 @@ S3 bucket создал через web-консоль AWS, в этом храни
 
 ### Результаты выполнения задания
 
-- получившаяся конфигурация находится в файле [main.tf](../terraform_repository/main.tf)
+- получившаяся конфигурация находится в файле [main.tf](https://github.com/nimlock/netology-terraform_repository/blob/e126472559ee4915286416442eb02c51e8fad18d/main.tf)
 
 - ```
   ivan@kubang:~/study/netology-virt/terraform_repository$ terraform validate

@@ -91,7 +91,7 @@ secret_key     ****************h9Z9 shared-credentials-file
  
 Свой образ ami можно создать с помощью [HashiCorp Packer](https://www.packer.io/).
 
-Репозиторий terraform-а я расположил в этом же git-репозитории на уровень выше в папке [terraform_repository](../terraform_repository).
+Репозиторий terraform-а я расположил в отдельном git-репозитории и подключил его в текущий репозиторий как submodule на уровень выше в папке terraform_repository. Ссылка на [репозиторий с проектом terraform](https://github.com/nimlock/netology-terraform_repository).
 
 Вывод команды `terraform plan`:
 
