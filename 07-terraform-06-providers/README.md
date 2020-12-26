@@ -23,9 +23,17 @@
 >    * Какая максимальная длина имени? 
 >    * Какому регулярному выражению должно подчиняться имя? 
 
+1. Перечисление доступных блоков типа `resource` и `data_source` находится в файле `provider.go`; ссылки на [начало `resource`](https://github.com/hashicorp/terraform-provider-aws/blob/master/aws/provider.go#L398) и [начало `data_source`](https://github.com/hashicorp/terraform-provider-aws/blob/master/aws/provider.go#L167).
 
+1. Ответы о параметре `name` ресурса `aws_sqs_queue`:
 
-## Задача 2. (Не обязательно) 
+- `name` конфликтует с параметром `name_prefix`, [ссылка](https://github.com/hashicorp/terraform-provider-aws/blob/6ca80625dfff5cfd3129d82a7e517fb8f05fd568/aws/resource_aws_sqs_queue.go#L56)
+
+- максимальная длина имени определена соответствующим валидатором `validateSQSQueueName` и (ограничена 80 символами](https://github.com/hashicorp/terraform-provider-aws/blob/6ca80625dfff5cfd3129d82a7e517fb8f05fd568/aws/validators.go#L1037)
+
+- в том же валидаторе указан допустимый шаблон имени в виде [регулярного выражения `^[0-9A-Za-z-_]+(\.fifo)?$`](https://github.com/hashicorp/terraform-provider-aws/blob/6ca80625dfff5cfd3129d82a7e517fb8f05fd568/aws/validators.go#L1041)
+
+## Задача 2. (Не обязательно) [не выполнено]
 >В рамках вебинара и презентации мы разобрали как создать свой собственный провайдер на примере кофемашины. 
 >Также вот официальная документация о создании провайдера: 
 >[https://learn.hashicorp.com/collections/terraform/providers](https://learn.hashicorp.com/collections/terraform/providers).
@@ -33,5 +41,3 @@
 >1. Проделайте все шаги создания провайдера.
 >2. В виде результата приложение ссылку на исходный код.
 >3. Попробуйте скомпилировать провайдер, если получится то приложите снимок экрана с командой и результатом компиляции.   
-
-
